@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Readamestag</title>
+    
+	<link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#800020">
+	
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+
+    <style>
+        /* --- إعدادات الألوان --- */
+        :root {
+            --bg-color: #f8f4f4;
+            --text-color: #333;
+            --card-bg: white;
+            --border-color: #e0d0d0;
+            --header-bg: #800020;
+            --header-text: white;
+            --btn-bg: white;
+            --btn-text: #800020;
+            --reader-bg: white;
+            --reader-text: #333;
+            --progress-bg: #ddd; 
+            
+            /* ألوان زر الحذف */
+            --delete-btn-border: #999;
+            --delete-btn-text: #777;
+            --delete-hover-bg: #555555; /* رمادي داكن */
+            --delete-hover-text: #f0f0f0; /* رمادي فاتح */
+        }
+
+        body.dark-mode {
+            --bg-color: #121212;
+            --text-color: #e0e0e0;
+            --card-bg: #1e1e1e;
+            --border-color: #444;
+            --header-bg: #4a0012;
+            --header-text: #f0f0f0;
+            --btn-bg: #333;
+            --btn-text: #f0f0f0;
+            --reader-bg: #1e1e1e;
+            --reader-text: #e0e0e0;
+            --progress-bg: #444;
+            
+            /* ألوان زر الحذف في الوضع الليلي */
+            --delete-btn-border: #666;
+            --delete-btn-text: #aaa;
+            --delete-hover-bg: #888888; 
+            --delete-hover-text: #111111; 
+        }
+
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 10px; text-align: center; display: flex; flex-direction: column; align-items: center; min-height: 100vh; box-sizing: border-box; transition: background-color 0.3s, color 0.3s; }
+        
+        .app-wrapper { width: 100%; max-width: 1000px; display: flex; flex-direction: column; flex-grow: 1; }
+        
+        /* الهيدر */
+        .header { background-color: var(--header-bg); color: var(--header-text); padding: 10px; border-radius: 10px 10px 0 0; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 10px rgba(0,0,0,0.1); flex-wrap: wrap; gap: 10px; }
+        .header h1 { margin: 0; font-size: 20px; letter-spacing: 1px; }
+        .header-btns { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; }
+        .btn { background-color: var(--btn-bg); color: var(--btn-text); padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; border: 1px solid var(--border-color); font-size: 14px; transition: 0.2s; }
+        .btn:hover { opacity: 0.8; transform: scale(1.05); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        /* واجهة المكتبة */
+        #libraryView, #dictionaryView { background-color: var(--card-bg); padding: 15px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); min-height: 400px; box-sizing: border-box; display: block; }
+        .library-title { color: var(--header-bg); text-align: right; border-bottom: 2px solid var(--header-bg); padding-bottom: 10px; margin-top: 0; font-size: 20px; }
+        .books-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; margin-top: 15px; }
+        
+        /* بطاقة الكتاب */
+        .book-card { background-color: var(--bg-color); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; text-align: center; position: relative; transition: 0.3s; display: flex; flex-direction: column; justify-content: space-between; }
+        .book-cover { background-color: var(--border-color); height: 150px; border-radius: 5px; display: flex; justify-content: center; align-items: center; margin-bottom: 10px; overflow: hidden; }
+        .book-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .book-cover span { font-size: 40px; }
+        .book-title { font-weight: bold; color: var(--text-color); margin-bottom: 10px; word-wrap: break-word; font-size: 14px; height: 40px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+        
+        .progress-container { width: 100%; background-color: var(--progress-bg); border-radius: 10px; height: 6px; margin-bottom: 5px; overflow: hidden; }
+        .progress-bar { height: 100%; background-color: var(--header-bg); width: 0%; transition: width 0.5s ease; }
+        .progress-text { font-size: 11px; color: var(--text-color); margin-bottom: 10px; font-weight: bold; opacity: 0.7; }
+
+        .open-btn { background-color: var(--header-bg); color: white; border: none; padding: 8px; border-radius: 5px; cursor: pointer; width: 100%; font-weight: bold; transition: 0.2s; font-size: 13px; }
+        
+        /* زر الحذف الأنيق */
+        .delete-btn { 
+            position: absolute; 
+            top: 5px; 
+            left: 5px; 
+            background: var(--card-bg); 
+            color: var(--delete-btn-text); 
+            border: 1px solid var(--delete-btn-border); 
+            font-size: 14px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            border-radius: 50%; 
+            width: 24px; 
+            height: 24px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            z-index: 10; 
+            transition: all 0.2s ease; 
+        }
+        
+        /* التأثير عند تمرير الماوس */
+        .delete-btn:hover { 
+            background-color: var(--delete-hover-bg); 
+            color: var(--delete-hover-text); 
+            border-color: var(--delete-hover-bg); 
+        }
+        
+        .empty-msg { color: var(--text-color); opacity: 0.6; font-size: 16px; margin-top: 50px; grid-column: 1 / -1; }
+
+        /* واجهة القراءة */
+        #readerView { display: none; flex-direction: column; width: 100%; }
+        #reader-container { 
+            background-color: var(--reader-bg); color: var(--reader-text); width: 100%; height: 65vh; min-height: 300px; padding: 20px; box-sizing: border-box; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: left; direction: ltr; font-size: 18px; line-height: 1.6; overflow-y: auto; position: relative; 
+            -webkit-user-select: text !important; user-select: text !important; -webkit-touch-callout: default !important;
+        }
+        
+        #pagination-controls { display: none; background-color: var(--header-bg); color: white; width: 100%; padding: 10px 20px; border-radius: 0 0 10px 10px; justify-content: space-between; align-items: center; box-sizing: border-box; }
+        .nav-btn { background-color: var(--btn-bg); color: var(--btn-text); border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 14px; }
+        .nav-btn:disabled { opacity: 0.5; }
+        #page-indicator { font-size: 14px; font-weight: bold; }
+
+        /* النافذة المنبثقة */
+        #popup { display: none; position: fixed; background-color: var(--header-bg); color: white; padding: 25px 15px 15px 15px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); flex-direction: column; gap: 8px; z-index: 9999; width: 280px; direction: rtl; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        #closePopupBtn { position: absolute; top: 5px; left: 5px; background: transparent; color: #ffcccc; border: none; font-size: 20px; cursor: pointer; font-weight: bold; padding: 0; }
+        #popup button.action-btn { background-color: white; color: #800020; border: none; padding: 10px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 14px; width: 100%; transition: 0.2s; }
+        #popup button.action-btn:active { transform: scale(0.95); }
+        #popup button.save-btn { background-color: #4CAF50; color: white; display: none; }
+        
+        .control-row { display: flex; align-items: center; justify-content: space-between; background-color: rgba(255,255,255,0.15); padding: 5px 10px; border-radius: 5px; font-size: 13px; margin-bottom: 5px; }
+        .control-row select { padding: 5px; border-radius: 4px; border: none; font-weight: bold; color: #800020; cursor: pointer; outline: none; width: 130px; }
+        #translation-result { display: none; background-color: #fff; color: #333; padding: 10px; border-radius: 5px; font-size: 15px; margin-top: 5px; text-align: right; max-height: 120px; overflow-y: auto; line-height: 1.4; }
+        
+        #overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9998; }
+
+        /* تنسيقات القاموس */
+        .dict-item { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; margin-bottom: 10px; text-align: right; position: relative; }
+        .dict-word { font-weight: bold; color: var(--header-bg); font-size: 18px; margin-bottom: 5px; direction: ltr; text-align: left; }
+        .dict-trans { color: var(--text-color); font-size: 16px; margin-bottom: 10px; }
+        .dict-actions { display: flex; gap: 10px; }
+        .dict-btn { padding: 5px 10px; border-radius: 5px; border: none; cursor: pointer; font-weight: bold; font-size: 12px; }
+        .dict-speak { background-color: #2196F3; color: white; }
+        .dict-del { background-color: #f44336; color: white; }
+    </style>
+</head>
+<body>
+
+    <div class="app-wrapper">
+        <div class="header">
+            <h1>Readamestag</h1>
+            <div class="header-btns">
+                <input type="file" id="fileInput" accept=".pdf,.epub" style="display: none;">
+                <button class="btn" id="uploadBtn">📁 رفع كتاب</button>
+                <button class="btn" id="dictBtn">📖 قاموسي</button>
+                <button class="btn" id="backToLibBtn" style="display: none;">⬅ عودة للمكتبة</button>
+                <button class="btn" id="themeBtn">🌙</button>
+            </div>
+        </div>
+
+        <div id="libraryView">
+            <h2 class="library-title">مكتبتي</h2>
+            <div class="books-grid" id="booksGrid">
+                <p class="empty-msg">المكتبة فارغة. قم برفع كتاب للبدء!</p>
+            </div>
+        </div>
+
+        <div id="dictionaryView" style="display: none;">
+            <h2 class="library-title">قاموسي الشخصي</h2>
+            <div id="dictList">
+                <p class="empty-msg">لم تقم بحفظ أي كلمات بعد.</p>
+            </div>
+        </div>
+
+        <div id="readerView">
+            <div id="reader-container"></div>
+            <div id="pagination-controls">
+                <button class="nav-btn" id="prevBtn">السابق</button>
+                <span id="page-indicator">صفحة 1 من 1</span>
+                <button class="nav-btn" id="nextBtn">التالي</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="overlay"></div>
+
+    <div id="popup">
+        <button id="closePopupBtn" title="إغلاق">✖</button>
+        <div class="control-row">
+            <label for="langSelect">لغة النطق:</label>
+            <select id="langSelect">
+                <option value="auto" selected>تلقائي (Auto)</option>
+                <option value="en">إنجليزي (EN)</option>
+                <option value="fr">فرنسي (FR)</option>
+            </select>
+        </div>
+        <div class="control-row">
+            <label for="speedSelect">سرعة الصوت:</label>
+            <select id="speedSelect">
+                <option value="0.5">0.5x</option>
+                <option value="0.75">0.75x</option>
+                <option value="1" selected>1x</option>
+                <option value="1.25">1.25x</option>
+                <option value="1.5">1.5x</option>
+            </select>
+        </div>
+        <button class="action-btn" id="listenBtn">🔊 استماع (Listen)</button>
+        <button class="action-btn" id="translateBtn">🌐 ترجمة للعربية</button>
+        <div id="translation-result"></div>
+        <button class="action-btn save-btn" id="saveWordBtn">💾 حفظ في القاموس</button>
+    </div>
+
+    <script>
+        // --- إعداد الوضع الليلي ---
+        const themeBtn = document.getElementById('themeBtn');
+        if (localStorage.getItem('theme') === 'dark') {
+            document.body.classList.add('dark-mode');
+            themeBtn.innerText = '☀️';
+        }
+
+        themeBtn.addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            if (document.body.classList.contains('dark-mode')) {
+                localStorage.setItem('theme', 'dark');
+                themeBtn.innerText = '☀️';
+            } else {
+                localStorage.setItem('theme', 'light');
+                themeBtn.innerText = '🌙';
+            }
+        });
+
+        // --- إعداد قاعدة البيانات ---
+        let db;
+        const request = indexedDB.open("ReadamestagDB", 2);
+        request.onupgradeneeded = function(e) {
+            db = e.target.result;
+            if (!db.objectStoreNames.contains("books")) {
+                db.createObjectStore("books", { keyPath: "id", autoIncrement: true });
+            }
+            if (!db.objectStoreNames.contains("dictionary")) {
+                db.createObjectStore("dictionary", { keyPath: "id", autoIncrement: true });
+            }
+        };
+        request.onsuccess = function(e) {
+            db = e.target.result;
+            loadLibrary();
+        };
+
+        // --- المتغيرات الأساسية ---
+        let selectedText = "";
+        let currentTranslation = "";
+        let availableVoices = [];
+        let bookPages = [];
+        let currentPageIndex = 0;
+        let currentBookId = null; 
+        let currentBookTitle = ""; 
+
+        // --- عناصر DOM ---
+        const popup = document.getElementById('popup');
+        const overlay = document.getElementById('overlay');
+        const readerContainer = document.getElementById('reader-container');
+        const translationResult = document.getElementById('translation-result');
+        const paginationControls = document.getElementById('pagination-controls');
+        const fileInput = document.getElementById('fileInput');
+        const libraryView = document.getElementById('libraryView');
+        const dictionaryView = document.getElementById('dictionaryView');
+        const readerView = document.getElementById('readerView');
+        const backToLibBtn = document.getElementById('backToLibBtn');
+        const saveWordBtn = document.getElementById('saveWordBtn');
+
+        // --- ربط الأزرار ---
+        document.getElementById('uploadBtn').addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', loadFile);
+        document.getElementById('listenBtn').addEventListener('click', speakText);
+        document.getElementById('translateBtn').addEventListener('click', translateText);
+        document.getElementById('closePopupBtn').addEventListener('click', closePopup);
+        overlay.addEventListener('click', closePopup);
+        
+        document.getElementById('dictBtn').addEventListener('click', () => {
+            libraryView.style.display = 'none';
+            readerView.style.display = 'none';
+            dictionaryView.style.display = 'block';
+            backToLibBtn.style.display = 'inline-block';
+            loadDictionary();
+        });
+
+        backToLibBtn.addEventListener('click', function() {
+            readerView.style.display = 'none';
+            dictionaryView.style.display = 'none';
+            libraryView.style.display = 'block';
+            backToLibBtn.style.display = 'none';
+            window.speechSynthesis.cancel(); 
+            currentBookId = null; 
+            loadLibrary(); 
+        });
+
+        window.speechSynthesis.onvoiceschanged = function() {
+            availableVoices = window.speechSynthesis.getVoices();
+        };
+
+        function closePopup() {
+            popup.style.display = 'none';
+            overlay.style.display = 'none';
+        }
+
+        // --- دالة عرض المكتبة ---
+        function loadLibrary() {
+            const grid = document.getElementById('booksGrid');
+            grid.innerHTML = "";
+            
+            const transaction = db.transaction(["books"], "readonly");
+            const store = transaction.objectStore("books");
+            const request = store.getAll();
+
+            request.onsuccess = function() {
+                const books = request.result;
+                if (books.length === 0) {
+                    grid.innerHTML = '<p class="empty-msg">المكتبة فارغة. قم برفع كتاب للبدء!</p>';
+                    return;
+                }
+                
+                books.forEach(book => {
+                    const card = document.createElement('div');
+                    card.className = 'book-card';
+                    
+                    let progressPercent = 0;
+                    if (book.lastPage !== undefined && book.pages.length > 0) {
+                        progressPercent = Math.round(((book.lastPage + 1) / book.pages.length) * 100);
+                        if(progressPercent > 100) progressPercent = 100;
+                    }
+
+                    let btnText = progressPercent > 0 ? `متابعة القراءة` : `بدء القراءة`;
+                    let coverHtml = book.coverImage ? `<img src="${book.coverImage}" alt="Cover">` : `<span>📖</span>`;
+
+                    card.innerHTML = `
+                        <button class="delete-btn" onclick="deleteBook(${book.id})" title="حذف">✖</button>
+                        <div class="book-cover">${coverHtml}</div>
+                        <div class="book-title">${book.title}</div>
+                        <div class="progress-container">
+                            <div class="progress-bar" style="width: ${progressPercent}%"></div>
+                        </div>
+                        <div class="progress-text">${progressPercent}% مكتمل</div>
+                        <button class="open-btn" onclick="openBook(${book.id})">${btnText}</button>
+                    `;
+                    grid.appendChild(card);
+                });
+            };
+        }
+
+        window.deleteBook = function(id) {
+            if(confirm("هل أنت متأكد من حذف هذا الكتاب؟")) {
+                const transaction = db.transaction(["books"], "readwrite");
+                const store = transaction.objectStore("books");
+                store.delete(id);
+                transaction.oncomplete = function() { loadLibrary(); };
+            }
+        };
+
+        window.openBook = function(id) {
+            currentBookId = id; 
+            const transaction = db.transaction(["books"], "readonly");
+            const store = transaction.objectStore("books");
+            const request = store.get(id);
+
+            request.onsuccess = function() {
+                const book = request.result;
+                if(book) {
+                    bookPages = book.pages;
+                    currentBookTitle = book.title;
+                    libraryView.style.display = 'none';
+                    dictionaryView.style.display = 'none';
+                    readerView.style.display = 'flex';
+                    backToLibBtn.style.display = 'inline-block';
+                    paginationControls.style.display = 'flex';
+                    renderPage(book.lastPage ? book.lastPage : 0);
+                }
+            };
+        };
+
+        function saveProgress(pageIndex) {
+            if (!currentBookId) return;
+            const transaction = db.transaction(["books"], "readwrite");
+            const store = transaction.objectStore("books");
+            const request = store.get(currentBookId);
+            request.onsuccess = function() {
+                const book = request.result;
+                if (book) {
+                    book.lastPage = pageIndex; 
+                    store.put(book); 
+                }
+            };
+        }
+
+        // --- أحداث تحديد النص ---
+        function handleSelection(e) {
+            setTimeout(() => {
+                const selection = window.getSelection().toString().trim();
+                if (selection.length > 0) {
+                    selectedText = selection;
+                    popup.style.display = 'flex';
+                    overlay.style.display = 'block';
+                    translationResult.style.display = 'none';
+                    saveWordBtn.style.display = 'none'; 
+                    currentTranslation = "";
+                }
+            }, 300);
+        }
+
+        readerContainer.addEventListener('mouseup', handleSelection);
+        readerContainer.addEventListener('touchend', handleSelection);
+
+        // --- الترجمة ---
+        async function translateText() {
+            const btn = document.getElementById('translateBtn');
+            btn.innerHTML = "⏳ جاري الترجمة...";
+            btn.disabled = true;
+            translationResult.style.display = 'block';
+            translationResult.innerHTML = "يرجى الانتظار...";
+            
+            try {
+                const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=ar&dt=t&q=${encodeURIComponent(selectedText)}`;
+                const response = await fetch(url);
+                const data = await response.json();
+                currentTranslation = data[0].map(item => item[0]).join('');
+                translationResult.innerHTML = currentTranslation;
+                saveWordBtn.style.display = 'block'; 
+            } catch (error) {
+                translationResult.innerHTML = "حدث خطأ في الترجمة.";
+            } finally {
+                btn.innerHTML = "🌐 ترجمة للعربية";
+                btn.disabled = false;
+            }
+        }
+
+        // --- حفظ الكلمة في القاموس ---
+        saveWordBtn.addEventListener('click', function() {
+            if (!selectedText || !currentTranslation) return;
+            
+            const transaction = db.transaction(["dictionary"], "readwrite");
+            const store = transaction.objectStore("dictionary");
+            const item = { 
+                word: selectedText, 
+                translation: currentTranslation, 
+                bookTitle: currentBookTitle,
+                date: new Date().toLocaleDateString('ar-EG')
+            };
+            
+            store.add(item);
+            transaction.oncomplete = function() {
+                saveWordBtn.innerHTML = "✅ تم الحفظ!";
+                setTimeout(() => { saveWordBtn.innerHTML = "💾 حفظ في القاموس"; }, 2000);
+            };
+        });
+
+        // --- عرض القاموس ---
+        function loadDictionary() {
+            const list = document.getElementById('dictList');
+            list.innerHTML = "";
+            
+            const transaction = db.transaction(["dictionary"], "readonly");
+            const store = transaction.objectStore("dictionary");
+            const request = store.getAll();
+
+            request.onsuccess = function() {
+                const words = request.result;
+                if (words.length === 0) {
+                    list.innerHTML = '<p class="empty-msg">لم تقم بحفظ أي كلمات بعد.</p>';
+                    return;
+                }
+                
+                words.reverse().forEach(item => { 
+                    const div = document.createElement('div');
+                    div.className = 'dict-item';
+                    div.innerHTML = `
+                        <div class="dict-word">${item.word}</div>
+                        <div class="dict-trans">${item.translation}</div>
+                        <div class="dict-actions">
+                            <button class="dict-btn dict-speak" onclick="speakDictWord('${item.word.replace(/'/g, "\\'")}')">🔊 استماع</button>
+                            <button class="dict-btn dict-del" onclick="deleteDictWord(${item.id})">🗑️ حذف</button>
+                        </div>
+                    `;
+                    list.appendChild(div);
+                });
+            };
+        }
+
+        window.deleteDictWord = function(id) {
+            const transaction = db.transaction(["dictionary"], "readwrite");
+            const store = transaction.objectStore("dictionary");
+            store.delete(id);
+            transaction.oncomplete = function() { loadDictionary(); };
+        };
+
+        window.speakDictWord = function(word) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(word);
+            let targetLang = detectLanguageFast(word);
+            utterance.lang = targetLang === 'fr' ? 'fr-FR' : 'en-US';
+            let matchedVoice = availableVoices.find(v => v.lang.startsWith(targetLang));
+            if (matchedVoice) utterance.voice = matchedVoice;
+            window.speechSynthesis.speak(utterance);
+        };
+
+        // --- اكتشاف اللغة والنطق ---
+        function detectLanguageFast(text) {
+            if (/[éèêëàâîïôûùçœ]/i.test(text)) return "fr";
+            if (/[ñáéíóúü]/i.test(text)) return "es";
+            if (/[äöüß]/i.test(text)) return "de";
+            if (/[\u0600-\u06FF]/.test(text)) return "ar";
+            const frenchWords = /\b(le|la|les|un|une|des|et|est|en|du|que|qui|dans|pour|pas|sur|au|avec|ce|il|elle|nous|vous|ils|elles)\b/i;
+            if (frenchWords.test(text)) return "fr";
+            return "en"; 
+        }
+
+        function speakText() {
+            if (!selectedText) return;
+            window.speechSynthesis.cancel(); 
+            
+            let selectedLangOption = document.getElementById('langSelect').value;
+            let targetLang = selectedLangOption === 'auto' ? detectLanguageFast(selectedText) : selectedLangOption;
+            
+            const utterance = new SpeechSynthesisUtterance(selectedText);
+            utterance.lang = targetLang === 'fr' ? 'fr-FR' : 'en-US';
+            
+            let matchedVoice = availableVoices.find(v => v.lang.startsWith(targetLang));
+            if (matchedVoice) utterance.voice = matchedVoice;
+            
+            utterance.rate = parseFloat(document.getElementById('speedSelect').value);
+            
+            const btn = document.getElementById('listenBtn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = "🔊 جاري التشغيل...";
+            utterance.onend = function() { btn.innerHTML = originalText; };
+            utterance.onerror = function() { btn.innerHTML = originalText; };
+            
+            window.speechSynthesis.speak(utterance);
+        }
+
+        // --- إدارة الصفحات ورفع الملفات ---
+        function renderPage(index) {
+            if (bookPages.length === 0) return;
+            if (index < 0) index = 0;
+            if (index >= bookPages.length) index = bookPages.length - 1;
+            
+            currentPageIndex = index;
+            readerContainer.innerHTML = bookPages[currentPageIndex];
+            readerContainer.scrollTop = 0; 
+            
+            document.getElementById('page-indicator').innerText = `صفحة ${currentPageIndex + 1} من ${bookPages.length}`;
+            document.getElementById('prevBtn').disabled = (currentPageIndex === 0);
+            document.getElementById('nextBtn').disabled = (currentPageIndex === bookPages.length - 1);
+            
+            saveProgress(currentPageIndex);
+        }
+
+        document.getElementById('prevBtn').addEventListener('click', () => renderPage(currentPageIndex - 1));
+        document.getElementById('nextBtn').addEventListener('click', () => renderPage(currentPageIndex + 1));
+
+        function splitTextIntoPages(text, maxChars = 1200) {
+            const words = text.split(/\s+/);
+            const pages = [];
+            let currentPage = "";
+            for (let word of words) {
+                if ((currentPage.length + word.length) > maxChars && currentPage.length > 0) {
+                    pages.push(`<p style="text-align:justify;">${currentPage.trim()}</p>`);
+                    currentPage = word + " ";
+                } else {
+                    currentPage += word + " ";
+                }
+            }
+            if (currentPage.trim().length > 0) pages.push(`<p style="text-align:justify;">${currentPage.trim()}</p>`);
+            return pages;
+        }
+
+        if (typeof pdfjsLib !== 'undefined') {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+        }
+
+        async function loadFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            document.getElementById('booksGrid').innerHTML = "<p style='text-align:center; color: var(--header-bg); font-weight: bold;'>جاري معالجة الملف واستخراج الغلاف... يرجى الانتظار</p>";
+            const fileType = file.name.split('.').pop().toLowerCase();
+            let extractedPages = [];
+            let coverBase64 = ""; 
+
+            try {
+                if (fileType === 'pdf') {
+                    const reader = new FileReader();
+                    reader.onload = async function() {
+                        try {
+                            const typedarray = new Uint8Array(this.result);
+                            const pdf = await pdfjsLib.getDocument(typedarray).promise;
+                            
+                            try {
+                                const page1 = await pdf.getPage(1);
+                                const viewport = page1.getViewport({ scale: 0.5 });
+                                const canvas = document.createElement('canvas');
+                                const context = canvas.getContext('2d');
+                                canvas.height = viewport.height;
+                                canvas.width = viewport.width;
+                                await page1.render({ canvasContext: context, viewport: viewport }).promise;
+                                coverBase64 = canvas.toDataURL('image/jpeg', 0.6);
+                            } catch (coverErr) {}
+
+                            for (let i = 1; i <= pdf.numPages; i++) {
+                                const page = await pdf.getPage(i);
+                                const textContent = await page.getTextContent();
+                                let pageText = textContent.items.map(item => item.str).join(" ");
+                                if(pageText.trim().length > 0) {
+                                    extractedPages.push(`<p style="text-align:justify;">${pageText}</p>`);
+                                }
+                            }
+                            saveBookToDB(file.name, extractedPages, coverBase64);
+                        } catch (e) {
+                            alert("فشل قراءة PDF: " + e.message);
+                            loadLibrary();
+                        }
+                    };
+                    reader.readAsArrayBuffer(file);
+                } 
+                else if (fileType === 'epub') {
+                    const zip = new JSZip();
+                    const contents = await zip.loadAsync(file);
+                    const imageFiles = Object.keys(contents.files).filter(path => 
+                        (path.toLowerCase().endsWith('.jpg') || path.toLowerCase().endsWith('.jpeg') || path.toLowerCase().endsWith('.png'))
+                    );
+                    let coverFile = imageFiles.find(f => f.toLowerCase().includes('cover'));
+                    if (!coverFile && imageFiles.length > 0) coverFile = imageFiles[0];
+
+                    if (coverFile) {
+                        const fileData = await contents.files[coverFile].async("base64");
+                        let mimeType = coverFile.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+                        coverBase64 = `data:${mimeType};base64,${fileData}`;
+                    }
+
+                    const htmlFiles = Object.keys(contents.files).filter(path => 
+                        (path.endsWith('.html') || path.endsWith('.xhtml')) && !contents.files[path].dir
+                    );
+                    if (htmlFiles.length === 0) throw new Error("لم يتم العثور على فصول.");
+                    
+                    for (let i = 0; i < htmlFiles.length; i++) {
+                        const filePath = htmlFiles[i];
+                        const fileData = await contents.files[filePath].async("string");
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(fileData, "text/html");
+                        const textContent = doc.body.textContent || "";
+                        const cleanText = textContent.replace(/\s+/g, ' ').trim();
+                        if (cleanText.length > 20) { 
+                            const chapterPages = splitTextIntoPages(cleanText, 1200);
+                            extractedPages.push(...chapterPages); 
+                        }
+                    }
+                    saveBookToDB(file.name, extractedPages, coverBase64);
+                }
+            } catch (error) {
+                alert("حدث خطأ: " + error.message);
+                loadLibrary();
+            }
+        }
+
+        function saveBookToDB(title, pages, coverImage) {
+            const transaction = db.transaction(["books"], "readwrite");
+            const store = transaction.objectStore("books");
+            const book = { title: title, pages: pages, lastPage: 0, coverImage: coverImage };
+            store.add(book);
+            transaction.oncomplete = function() {
+                fileInput.value = ""; 
+                loadLibrary(); 
+            };
+            transaction.onerror = function(e) {
+                alert("المساحة ممتلئة! لا يمكن حفظ المزيد من الكتب.");
+                loadLibrary();
+            };
+        }
+    </script>
+</body>
+</html>
